@@ -4,23 +4,26 @@ require 'pry'
 target = "./technical_note.ipynb"
 
 class Test
-  def run
+  def run(opt=nil)
+
+    prefix = opt ? /^#{opt}_/ : /^test_/ 
+    
     counter = 0
     succseed_flag = true
-    self.methods.grep(/test_/).each do |test|
+    self.methods.grep(prefix).each do |test|
       counter += 1
       begin
         self.send test
       rescue => e
         succseed_flag = false
-        puts "Failed!!: #{test.to_s[5..-1]}"
+        puts "Failed!!: #{test.to_s}"
         puts e
       else
         print '.' 
       end
     end
 
-    print "#{counter} tests passed!" if succseed_flag 
+    print " #{counter} tests passed!" if succseed_flag 
   end
 
   def assert(tf, message = 'Assertion failed!')
@@ -118,7 +121,7 @@ class Newcommand
 
   def expand_tail
     if arg_num > 0
-      args, @tail = Braces.p @tail
+      args, @tail = Braces.p @tail, @arg_num
     else
       args = []
     end
@@ -146,17 +149,22 @@ class Test
     assert nc.expr=='\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
   end
 
-
-
   def test_new_commad_expand_arg0
     nc = Newcommand.new
     nc.create '\\newcommand{\\mr}{\\mathrm}'
 
-    assert (nc.expand "\\mr") == "\\mathrm", 'ccccccccccccc'
-    assert (nc.expand "\\mr \\mr") == "\\mathrm \\mathrm", 'bbbbbbbbbb'
+    assert (nc.expand "\\mr") == "\\mathrm"
+    assert (nc.expand "\\mr \\mr") == "\\mathrm \\mathrm"
+    assert (nc.expand "\\mrr \\mr") == "\\mrr \\mathrm"
   end
 
-  def test_owari 
+  def test_new_command_expand_arg2
+    nc = Newcommand.new
+    nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
+
+    assert (nc.expand "\\diff{y}{x}") == "\\frac{\\mr{d}y}{\\mr{d}x}"
+    assert (nc.expand " \\diff{y}{x} aaa") == " \\frac{\\mr{d}y}{\\mr{d}x} aaa"
+    assert (nc.expand " \\diff{y}{x} \\diff{f}{z}") == " \\frac{\\mr{d}y}{\\mr{d}x} \\frac{\\mr{d}f}{\\mr{d}z}"
   end
 
 end
