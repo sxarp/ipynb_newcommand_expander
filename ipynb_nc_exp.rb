@@ -3,8 +3,33 @@ require 'pry'
 
 target = "./technical_note.ipynb"
 
+class Test
+  def run
+    counter = 0
+    succseed_flag = true
+    self.methods.grep(/test_/).each do |test|
+      counter += 1
+      begin
+        self.send test
+      rescue => e
+        succseed_flag = false
+        puts "Failed!!: #{test.to_s[5..-1]}"
+        puts e
+      else
+        print '.' 
+      end
+    end
+
+    print "#{counter} tests passed!" if succseed_flag 
+  end
+
+  def assert(tf, message = 'Assertion failed!')
+    raise message unless tf
+  end
+end
+
 module Braces
-  def parse(s)
+  def self.parse(s)
     head = ""
     tail = ""
     raise "The first Character need to be '{'!" unless s[0] == "{"
@@ -40,7 +65,7 @@ module Braces
     args = num==1 ? "" : []
     tail = s
     num.times do
-      h, tail = parse tail
+      h, tail = self.parse tail
       args << h[1..-2]
     end
 
@@ -49,21 +74,19 @@ module Braces
 end
 
 class Newcommand
+
+  attr_accessor :name, :arg_num, :expr
+
   def create(sequence)
 
-    m = /\\newcommand{\\(.+)}(.*)/.match sequence
+    m = /\\newcommand{\\([^}]+)}(\[[0-9]+\]|)({.*)/.match sequence
+
+    raise "Invalid newcommand definition!" unless m
+
     @name=m[1]
-    sequence=m[2]
+    @arg_num= m[2].length == 0 ? 0 : /\[([0-9]+)\]/.match(m[2])[1].to_i
+    @expr, sequence = Braces.p m[3]
 
-    raise "Invalid newcommand definition!" unless m
-
-    m = /\[([0-9]+)\](.*)/.match sequence
-    @arg_num=(m || [])[1].to_i
-    sequence = (m || [])[2] || sequence
-
-    raise "Invalid newcommand definition!" unless m
-
-    @expr, sequence = Braces.p sequence
     sequence
   end
 
@@ -99,8 +122,40 @@ class Newcommand
   end
 end
 
+class Test
+  
+  def test_create_new_command_argzero
+    nc = Newcommand.new
+    nc.create '\\newcommand{\\mr}{\\mathrm}'
+    
+    assert nc.name=='mr'
+    assert nc.arg_num==0
+    assert nc.expr=='\\mathrm'
+  end
+ 
+  def test_create_new_command_arg2
+    nc = Newcommand.new
+    nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
+    
+    assert nc.name=='diff', 'name is wrong'
+    assert nc.arg_num==2, 'argnum is wrong'
+    assert nc.expr=='\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
+  end
+
+
+
+  def test_aaaaaa
+  end
+
+  def test_owari 
+  end
+
+end
+
+Test.new.run
 
 File.open(target) do |file|
+
   counter=0
   binding.pry
   file.each_line do |line|
