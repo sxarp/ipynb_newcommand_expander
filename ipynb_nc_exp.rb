@@ -105,7 +105,7 @@ class Newcommand
 
   private
   def find
-    m=/(.*)\\#{@name}(.*)/.match @tail
+    m=/^(.*?)\\#{@name}([^a-z].*|)$/.match @tail
     if m
       @head << m[1]
       @tail=m[2]
@@ -117,7 +117,11 @@ class Newcommand
   end
 
   def expand_tail
-    args, @tail = Braces.p @tail
+    if arg_num > 0
+      args, @tail = Braces.p @tail
+    else
+      args = []
+    end
     @head << (1..arg_num).to_a.zip(args).reduce(@expr){|expr, arg| expr.gsub("##{arg[0]}", arg[1])}
   end
 end
@@ -144,7 +148,12 @@ class Test
 
 
 
-  def test_aaaaaa
+  def test_new_commad_expand_arg0
+    nc = Newcommand.new
+    nc.create '\\newcommand{\\mr}{\\mathrm}'
+
+    assert (nc.expand "\\mr") == "\\mathrm", 'ccccccccccccc'
+    assert (nc.expand "\\mr \\mr") == "\\mathrm \\mathrm", 'bbbbbbbbbb'
   end
 
   def test_owari 
@@ -157,7 +166,6 @@ Test.new.run
 File.open(target) do |file|
 
   counter=0
-  binding.pry
   file.each_line do |line|
     counter += 1; break if counter >= 10
     m = /\s*"cell_type":\s"markdown",(.*)/.match line
