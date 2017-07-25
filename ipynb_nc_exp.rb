@@ -1,7 +1,6 @@
 require 'json'
 require 'pry'
 
-target = "./technical_note.ipynb"
 
 class Test
   def run(opt=nil)
@@ -188,7 +187,7 @@ class RegexStateMachine
 end
 
 class Test
-  def wip_state_machine
+  def test_state_machine
     rst = RegexStateMachine.new :a, a: [/b/, :b], b: [/c/, :c], c: [/a/, :a]
 
     eq rst.state, :a
@@ -203,17 +202,46 @@ class Test
   end
 end
 
-Test.new.run 'wip'
+Test.new.run
+
+target = "./technical_note.ipynb"
+
+class Worker
+
+  def initialize(inputfile)
+    @inputfile=inputfile
+    @cell_finder=RegexStateMachine.new :init, {init: [/^.*"cell_type":.*"markdown".*/, :meta_data], meta_data: [/.*metadata.*/, :source],
+                                               source: [/.*source.*/, :just_before], just_before: [/.*/, :markdown], markdown: [/^[^"]*\][^"]*/, :init]}
+  end
+
+  def markdown
+    File.open(@inputfile) do |file|
+      file.each_line do |line|
+        @cell_finder.evolve line
+        if @cell_finder.state == :markdown
+          puts yield(line)
+        else
+          puts @cell_finder.state.to_s + line
+        end
+      end
+    end
+  end
+end
+
 
 File.open(target) do |file|
 
   counter=0
   file.each_line do |line|
-    counter += 1; break if counter >= 30
+    counter += 1; break if counter >= 60
     m = /\s*"cell_type":\s"markdown",(.*)/.match line
     binding.pry unless (m || [nil, "nomatch"])[1] 
     puts (m ? "match:" + m[1] +"|"+ line : "nomatch:" + line)
   end
+end
+
+Worker.new(target).markdown do |line|
+  '-----' + line
 end
 
 puts "end"
