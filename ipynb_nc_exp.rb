@@ -7,7 +7,6 @@ class Test
   def run(opt=nil)
 
     prefix = opt ? /^#{opt}_/ : /^test_/ 
-    
     counter = 0
     succseed_flag = true
     self.methods.grep(prefix).each do |test|
@@ -28,6 +27,10 @@ class Test
 
   def assert(tf, message = 'Assertion failed!')
     raise message unless tf
+  end
+
+  def eq(lht, rht, message = 'Not equal!')
+    raise "#{message} \nlht is #{lht}\nwhile rht is #{rht}" unless lht==rht
   end
 end
 
@@ -135,47 +138,78 @@ class Test
     nc = Newcommand.new
     nc.create '\\newcommand{\\mr}{\\mathrm}'
     
-    assert nc.name=='mr'
-    assert nc.arg_num==0
-    assert nc.expr=='\\mathrm'
+    eq nc.name, 'mr'
+    eq nc.arg_num, 0
+    eq nc.expr, '\\mathrm'
   end
  
   def test_create_new_command_arg2
     nc = Newcommand.new
     nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
     
-    assert nc.name=='diff', 'name is wrong'
-    assert nc.arg_num==2, 'argnum is wrong'
-    assert nc.expr=='\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
+    eq nc.name, 'diff', 'name is wrong'
+    eq nc.arg_num, 2, 'argnum is wrong'
+    eq nc.expr, '\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
   end
 
   def test_new_commad_expand_arg0
     nc = Newcommand.new
     nc.create '\\newcommand{\\mr}{\\mathrm}'
 
-    assert (nc.expand "\\mr") == "\\mathrm"
-    assert (nc.expand "\\mr \\mr") == "\\mathrm \\mathrm"
-    assert (nc.expand "\\mrr \\mr") == "\\mrr \\mathrm"
+    eq (nc.expand "\\mr"), "\\mathrm"
+    eq (nc.expand "\\mr \\mr"), "\\mathrm \\mathrm"
+    eq (nc.expand "\\mrr \\mr"), "\\mrr \\mathrm"
   end
 
   def test_new_command_expand_arg2
     nc = Newcommand.new
     nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
 
-    assert (nc.expand "\\diff{y}{x}") == "\\frac{\\mr{d}y}{\\mr{d}x}"
-    assert (nc.expand " \\diff{y}{x} aaa") == " \\frac{\\mr{d}y}{\\mr{d}x} aaa"
-    assert (nc.expand " \\diff{y}{x} \\diff{f}{z}") == " \\frac{\\mr{d}y}{\\mr{d}x} \\frac{\\mr{d}f}{\\mr{d}z}"
+    eq (nc.expand "\\diff{y}{x}"), "\\frac{\\mr{d}y}{\\mr{d}x}"
+    eq (nc.expand " \\diff{y}{x} aaa"), " \\frac{\\mr{d}y}{\\mr{d}x} aaa"
+    eq (nc.expand " \\diff{y}{x} \\diff{f}{z}"), " \\frac{\\mr{d}y}{\\mr{d}x} \\frac{\\mr{d}f}{\\mr{d}z}"
+    eq (nc.expand " \\diff{y}{x} \\difff{f}{z}"), " \\frac{\\mr{d}y}{\\mr{d}x} \\difff{f}{z}"
   end
-
 end
 
-Test.new.run
+class RegexStateMachine
+  attr_accessor :state
+
+  def initialize(ini_state, state_transition)
+    @state=ini_state
+    @transition=state_transition
+  end
+
+  def evolve(str)
+    reg, next_state = @transition[@state]
+    raise "next state of #{@state} undetermind!" unless reg && next_state
+    @state = next_state if reg.match str
+  end
+end
+
+class Test
+  def wip_state_machine
+    rst = RegexStateMachine.new :a, a: [/b/, :b], b: [/c/, :c], c: [/a/, :a]
+
+    eq rst.state, :a
+    rst.evolve 'b'
+    eq rst.state, :b
+    rst.evolve 'x'
+    eq rst.state, :b
+    rst.evolve 'c'
+    eq rst.state, :c
+    rst.evolve 'a'
+    eq rst.state, :a
+  end
+end
+
+Test.new.run 'wip'
 
 File.open(target) do |file|
 
   counter=0
   file.each_line do |line|
-    counter += 1; break if counter >= 10
+    counter += 1; break if counter >= 30
     m = /\s*"cell_type":\s"markdown",(.*)/.match line
     binding.pry unless (m || [nil, "nomatch"])[1] 
     puts (m ? "match:" + m[1] +"|"+ line : "nomatch:" + line)
