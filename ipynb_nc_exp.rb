@@ -42,10 +42,10 @@ module Braces
     endflag = false
 
     s.each_char do |c|
-     if endflag
-       tail << c
-       next
-     end
+      if endflag
+        tail << c
+        next
+      end
 
       raise "Braces unmatched!" if stack < 0
 
@@ -79,9 +79,9 @@ module Braces
 end
 
 module CSG_Expander
-  def apply(sentence, matcher)
-    m = /(^.*?)(#{test.inspect[1..-2]}.*)/.match sentence
-    return m ? apply(m[1]+yield(m[2])) : sentence
+  def self.apply(sentence, matcher, &block)
+    m = /(^.*?)(#{matcher.inspect[1..-2]}.*)/.match sentence
+    m ? self.apply(m[1] + block.call(m[2]), matcher, &block) : sentence
   end
 end
 
@@ -107,52 +107,33 @@ class Newcommand
   end
 
   def expand(sequence)
-    @head=""
-    @tail=sequence
-    while find
-     expand_tail
+    CSG_Expander.apply sequence, /\\#{@name}([^a-z].*|$)/ do |seq|
+      m = /\\#{@name}(.*)/.match seq
+      if @arg_num > 0
+        args, tail = Braces.p m[1], @arg_num
+      else
+        args = []; tail = m[1]
+      end
+      (1..@arg_num).to_a.zip(args).reduce(@expr){|expr, arg| expr.gsub("##{arg[0]}", arg[1])} + tail
     end
-    @head
-  end
-
-  private
-  def find
-    m=/^(.*?)\\#{@name}([^a-z].*|)$/.match @tail
-    if m
-      @head << m[1]
-      @tail=m[2]
-      true
-    else
-      @head << @tail
-      false
-    end
-  end
-
-  def expand_tail
-    if arg_num > 0
-      args, @tail = Braces.p @tail, @arg_num
-    else
-      args = []
-    end
-    @head << (1..arg_num).to_a.zip(args).reduce(@expr){|expr, arg| expr.gsub("##{arg[0]}", arg[1])}
   end
 end
 
 class Test
-  
+
   def test_create_new_command_argzero
     nc = Newcommand.new
     nc.create '\\newcommand{\\mr}{\\mathrm}'
-    
+
     eq nc.name, 'mr'
     eq nc.arg_num, 0
     eq nc.expr, '\\mathrm'
   end
- 
+
   def test_create_new_command_arg2
     nc = Newcommand.new
     nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
-    
+
     eq nc.name, 'diff', 'name is wrong'
     eq nc.arg_num, 2, 'argnum is wrong'
     eq nc.expr, '\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
@@ -236,7 +217,7 @@ class Worker
 end
 
 Worker.new(target).markdown do |line|
-  puts '-----' + line
+  #puts '-----' + line
 end
 
 puts "end"
