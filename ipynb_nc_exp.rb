@@ -78,6 +78,13 @@ module Braces
   end
 end
 
+module CSG_Expander
+  def apply(sentence, matcher)
+    m = /(^.*?)(#{test.inspect[1..-2]}.*)/.match sentence
+    return m ? apply(m[1]+yield(m[2])) : sentence
+  end
+end
+
 class Newcommand
 
   attr_accessor :name, :arg_num, :expr
@@ -219,29 +226,17 @@ class Worker
       file.each_line do |line|
         @cell_finder.evolve line
         if @cell_finder.state == :markdown
-          puts yield(line)
+          yield(line)
         else
-          puts @cell_finder.state.to_s + line
+          #puts @cell_finder.state.to_s + line
         end
       end
     end
   end
 end
 
-
-File.open(target) do |file|
-
-  counter=0
-  file.each_line do |line|
-    counter += 1; break if counter >= 60
-    m = /\s*"cell_type":\s"markdown",(.*)/.match line
-    binding.pry unless (m || [nil, "nomatch"])[1] 
-    puts (m ? "match:" + m[1] +"|"+ line : "nomatch:" + line)
-  end
-end
-
 Worker.new(target).markdown do |line|
-  '-----' + line
+  puts '-----' + line
 end
 
 puts "end"
