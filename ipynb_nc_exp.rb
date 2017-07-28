@@ -192,17 +192,15 @@ end
 
 Test.new.run
 
-target = "./technical_note.ipynb"
-
-class Worker
-
+class Markdown
   def initialize(inputfile)
     @inputfile=inputfile
     @cell_finder=RegexStateMachine.new :init, {init: [/^.*"cell_type":.*"markdown".*/, :meta_data], meta_data: [/.*metadata.*/, :source],
                                                source: [/.*source.*/, :just_before], just_before: [/.*/, :markdown], markdown: [/^[^"]*\][^"]*/, :init]}
+    @cell_finder
   end
 
-  def markdown
+  def edit
     File.open(@inputfile) do |file|
       file.each_line do |line|
         @cell_finder.evolve line
@@ -216,8 +214,15 @@ class Worker
   end
 end
 
-Worker.new(target).markdown do |line|
-  #puts '-----' + line
+class Latex
+  def edit
+    Markdown.new("./technical_note.ipynb").edit do |line|
+      #todo extract marh
+      puts '-----' + line
+    end
+  end
 end
+
+Latex.new.edit
 
 puts "end"
