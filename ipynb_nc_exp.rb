@@ -175,7 +175,7 @@ class RegexStateMachine
 end
 
 class Test
-  def wip_test_state_machine2
+  def test_state_machine2
     rst = RegexStateMachine.new :a, a: {b: /b/}, b: {c: /c/}, c: {a: /a/}
 
     eq rst.state, :a
@@ -191,7 +191,7 @@ class Test
 end
 
 class Test
-  def wip_test_state_machine3
+  def test_state_machine3
     rst = RegexStateMachine.new :a, a: {b: /b/, c: /c/}, b: {c: /c/, a: /a/}, c: {a: /a/}
 
     eq rst.state, :a
@@ -209,13 +209,15 @@ class Test
   end
 end
 
-Test.new.run 'wip'
+Test.new.run# 'wip'
 
 class Markdown
   def initialize(inputfile)
     @inputfile=inputfile
-    @cell_finder=RegexStateMachine.new :init, {init: [/^.*"cell_type":.*"markdown".*/, :meta_data], meta_data: [/.*metadata.*/, :source],
-                                               source: [/.*source.*/, :just_before], just_before: [/.*/, :markdown], markdown: [/^[^"]*\][^"]*/, :init]}
+
+    @cell_finder=RegexStateMachine.new :init, init: {meta_data: /^.*"cell_type":.*"markdown".*/}, meta_data: {source: /.*metadata.*/},
+                                               source: {just_before: /.*source.*/}, just_before: {markdown: /.*/}, markdown: {init: /^[^"]*\][^"]*/}
+ 
     @cell_finder
   end
   def edit
@@ -242,6 +244,6 @@ class Latex
   end
 end
 
-#Latex.new.edit
+Latex.new.edit
 
 puts "end"
