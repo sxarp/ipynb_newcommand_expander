@@ -163,20 +163,20 @@ class RegexStateMachine
   attr_accessor :state
 
   def initialize(ini_state, state_transition)
-    @state=ini_state
-    @transition=state_transition
+    @state = ini_state
+    @transition = state_transition
   end
 
   def evolve(str)
-    reg, next_state = @transition[@state]
-    raise "next state of #{@state} undetermind!" unless reg && next_state
-    @state = next_state if reg.match str
+    candidates = @transition[@state]
+    raise "next state of #{@state} undetermind!" unless candidates
+    @state = candidates.select{|state, reg| reg.match str}.keys.first || @state
   end
 end
 
 class Test
-  def test_state_machine
-    rst = RegexStateMachine.new :a, a: [/b/, :b], b: [/c/, :c], c: [/a/, :a]
+  def wip_test_state_machine2
+    rst = RegexStateMachine.new :a, a: {b: /b/}, b: {c: /c/}, c: {a: /a/}
 
     eq rst.state, :a
     rst.evolve 'b'
@@ -190,7 +190,26 @@ class Test
   end
 end
 
-Test.new.run
+class Test
+  def wip_test_state_machine3
+    rst = RegexStateMachine.new :a, a: {b: /b/, c: /c/}, b: {c: /c/, a: /a/}, c: {a: /a/}
+
+    eq rst.state, :a
+    rst.evolve 'c'
+    eq rst.state, :c
+    rst.evolve 'x'
+    eq rst.state, :c
+    rst.evolve 'a'
+    eq rst.state, :a
+    rst.evolve 'b'
+    eq rst.state, :b
+    rst.evolve 'a'
+    eq rst.state, :a
+
+  end
+end
+
+Test.new.run 'wip'
 
 class Markdown
   def initialize(inputfile)
@@ -199,7 +218,6 @@ class Markdown
                                                source: [/.*source.*/, :just_before], just_before: [/.*/, :markdown], markdown: [/^[^"]*\][^"]*/, :init]}
     @cell_finder
   end
-
   def edit
     File.open(@inputfile) do |file|
       file.each_line do |line|
@@ -217,12 +235,13 @@ end
 class Latex
   def edit
     Markdown.new("./technical_note.ipynb").edit do |line|
-      #todo extract marh
+      #todo extract math
+      #yield line
       puts '-----' + line
     end
   end
 end
 
-Latex.new.edit
+#Latex.new.edit
 
 puts "end"
