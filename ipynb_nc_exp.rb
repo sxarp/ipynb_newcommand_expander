@@ -216,8 +216,8 @@ class Markdown
     @inputfile=inputfile
 
     @cell_finder=RegexStateMachine.new :init, init: {meta_data: /^.*"cell_type":.*"markdown".*/}, meta_data: {source: /.*metadata.*/},
-                                               source: {just_before: /.*source.*/}, just_before: {markdown: /.*/}, markdown: {init: /^[^"]*\][^"]*/}
- 
+      source: {just_before: /.*source.*/}, just_before: {markdown: /.*/}, markdown: {init: /^[^"]*\][^"]*/}
+
     @cell_finder
   end
   def edit
@@ -225,6 +225,7 @@ class Markdown
       file.each_line do |line|
         @cell_finder.evolve line
         if @cell_finder.state == :markdown
+          binding.pry unless /^[^"]*"[^\n]*\n",/.match line
           yield(line)
         else
           #puts @cell_finder.state.to_s + line
@@ -236,14 +237,25 @@ end
 
 class Latex
   def edit
-    Markdown.new("./technical_note.ipynb").edit do |line|
-      #todo extract math
-      #yield line
-      puts '-----' + line
+    math_finder = RegexStateMachine.new :text, text: {doller: /\$/}, doller: {inline: /^[^\$].*/, ddoller: /\$/},
+      ddoller: {enviroment: /[^\$].*/, invalid: /^\$.*/}, inline: {text: /\$/}, enviroment: {close_doller: /\$/},
+      close_doller: {text: /\$/, invalid: /[^\$].*/}
+
+    Markdown.new("./technical_note.ipynb").edit do |tail|
+      until tail == '' do
+        m = /^([^\$]*)(.*)$/.match tail
+        m = /^(.)(.*)$/.match tail if m[1] == ''
+        head, tail = m[1], m[2]
+        math_finder.evolve head
+        yield
+        puts "#{math_finder.state} -- #{head}"  #[:inline, :enviroment].include? math_finder.state ?
+      end
     end
+    raise 'Invalid input!' unless math_finder.state == :text
   end
 end
 
-Latex.new.edit
-
+Markdown.new("./technical_note.ipynb").edit do |line|
+  puts line
+end
 puts "end"
