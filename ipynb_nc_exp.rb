@@ -225,8 +225,8 @@ class Markdown
       file.each_line do |line|
         @cell_finder.evolve line
         if @cell_finder.state == :markdown
-          binding.pry unless /^[^"]*"[^\n]*\n",/.match line
-          yield(line)
+          m = /^[^"]*"(.*)(\\n",|"\n)$/.match line
+          yield(m[1])
         else
           #puts @cell_finder.state.to_s + line
         end
@@ -247,15 +247,18 @@ class Latex
         m = /^(.)(.*)$/.match tail if m[1] == ''
         head, tail = m[1], m[2]
         math_finder.evolve head
-        yield
-        puts "#{math_finder.state} -- #{head}"  #[:inline, :enviroment].include? math_finder.state ?
+        yield tail if [:inline, :enviroment].include? math_finder.state
       end
     end
-    raise 'Invalid input!' unless math_finder.state == :text
   end
 end
 
 Markdown.new("./technical_note.ipynb").edit do |line|
   puts line
 end
+
+Latex.new.edit do |math|
+  puts math
+end
+
 puts "end"
