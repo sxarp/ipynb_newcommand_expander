@@ -1,7 +1,3 @@
-require 'json'
-require 'pry'
-
-
 class Test
   def run(opt=nil)
 
