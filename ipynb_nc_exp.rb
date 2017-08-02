@@ -212,53 +212,69 @@ end
 Test.new.run# 'wip'
 
 class Markdown
-  def initialize(inputfile)
-    @inputfile=inputfile
-
+  def initialize(input_file)
+    @inputfile=input_file
+    read
     @cell_finder=RegexStateMachine.new :init, init: {meta_data: /^.*"cell_type":.*"markdown".*/}, meta_data: {source: /.*metadata.*/},
       source: {just_before: /.*source.*/}, just_before: {markdown: /.*/}, markdown: {init: /^[^"]*\][^"]*/}
-
-    @cell_finder
   end
-  def edit
+
+  def read
+    @data = []
     File.open(@inputfile) do |file|
       file.each_line do |line|
-        @cell_finder.evolve line
-        if @cell_finder.state == :markdown
-          m = /^[^"]*"(.*)(\\n",|"\n)$/.match line
-          yield(m[1])
-        else
-          #puts @cell_finder.state.to_s + line
-        end
+        puts line
+        @data << line
       end
     end
   end
+
+  def save output_file
+    File.open(output_file, 'w'){|file| @data.each{|line| file.puts(line)}}
+  end
+
+  def edit
+    @data.map! do |line|
+      @cell_finder.evolve line
+      if @cell_finder.state == :markdown
+        m = /^([^"]*")(.*)(\\n",|"\n)$/.match line
+        m[1]+yield(m[2]).to_s+m[3]
+      else
+        line
+      end
+    end
+    self
+  end
 end
 
-class Latex
+class Latex < Markdown
+
   def edit
     math_finder = RegexStateMachine.new :text, text: {doller: /\$/}, doller: {inline: /^[^\$].*/, ddoller: /\$/},
       ddoller: {enviroment: /[^\$].*/, invalid: /^\$.*/}, inline: {text: /\$/}, enviroment: {close_doller: /\$/},
       close_doller: {text: /\$/, invalid: /[^\$].*/}
-
-    Markdown.new("./technical_note.ipynb").edit do |tail|
+    result = ''
+    super do |tail|
       until tail == '' do
         m = /^([^\$]*)(.*)$/.match tail
         m = /^(.)(.*)$/.match tail if m[1] == ''
         head, tail = m[1], m[2]
         math_finder.evolve head
-        yield tail if [:inline, :enviroment].include? math_finder.state
+        result << ([:inline, :enviroment].include? math_finder.state) ? (yield head) : head
       end
     end
+    result
   end
 end
 
-Markdown.new("./technical_note.ipynb").edit do |line|
-  puts line
-end
+#Markdown.new("./technical_note.ipynb").edit do |line|
+#  puts line
+#end
 
-Latex.new.edit do |math|
-  puts math
-end
+mr = Newcommand.new
+mr.create('\newcommand{\mr}{\mathrm}')
+Markdown.new("./technical_note.ipynb").edit do |math|
+  mr.expand(math)
+end.save("./technical_note_ed.ipynb")
 
 puts "end"
