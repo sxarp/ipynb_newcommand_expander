@@ -253,17 +253,18 @@ class Latex < Markdown
     math_finder = RegexStateMachine.new :text, text: {doller: /\$/}, doller: {inline: /^[^\$].*/, ddoller: /\$/},
       ddoller: {enviroment: /[^\$].*/, invalid: /^\$.*/}, inline: {text: /\$/}, enviroment: {close_doller: /\$/},
       close_doller: {text: /\$/, invalid: /[^\$].*/}
-    result = ''
     super do |tail|
+      result = ''
       until tail == '' do
         m = /^([^\$]*)(.*)$/.match tail
         m = /^(.)(.*)$/.match tail if m[1] == ''
         head, tail = m[1], m[2]
         math_finder.evolve head
-        result << ([:inline, :enviroment].include? math_finder.state) ? (yield head) : head
+        result << (([:inline, :enviroment].include? math_finder.state) ? (yield head) : head)
       end
+      result
     end
-    result
+    self
   end
 end
 
@@ -273,7 +274,7 @@ end
 
 mr = Newcommand.new
 mr.create('\newcommand{\mr}{\mathrm}')
-Markdown.new("./technical_note.ipynb").edit do |math|
+Latex.new("./technical_note.ipynb").edit do |math|
   mr.expand(math)
 end.save("./technical_note_ed.ipynb")
 
