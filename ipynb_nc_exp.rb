@@ -91,7 +91,7 @@ class Newcommand
 
   def create(sequence)
 
-    m = /\\newcommand{\\([^}]+)}(\[[0-9]+\]|)({.*)/.match sequence
+    m = /\\\\newcommand{\\\\([^}]+)}(\[[0-9]+\]|)({.*)/.match sequence
 
     raise "Invalid newcommand definition!" unless m
 
@@ -107,8 +107,8 @@ class Newcommand
   end
 
   def expand(sequence)
-    CSG_Expander.apply sequence, /\\#{@name}([^a-z].*|$)/ do |seq|
-      m = /\\#{@name}(.*)/.match seq
+    CSG_Expander.apply sequence, /\\\\#{@name}([^a-z].*|$)/ do |seq|
+      m = /\\\\#{@name}(.*)/.match seq
       if @arg_num > 0
         args, tail = Braces.p m[1], @arg_num
       else
@@ -123,47 +123,47 @@ class Test
 
   def test_create_new_command_argzero
     nc = Newcommand.new
-    nc.create '\\newcommand{\\mr}{\\mathrm}'
+    nc.create '\\\\newcommand{\\\\mr}{\\\\mathrm}'
 
     eq nc.name, 'mr'
     eq nc.arg_num, 0
-    eq nc.expr, '\\mathrm'
+    eq nc.expr, '\\\\mathrm'
   end
 
   def test_create_new_command_arg2
     nc = Newcommand.new
-    nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
+    nc.create '\\\\newcommand{\\\\diff}[2]{\\\\frac{\\\\mr{d}#1}{\\\\mr{d}#2}}'
 
     eq nc.name, 'diff', 'name is wrong'
     eq nc.arg_num, 2, 'argnum is wrong'
-    eq nc.expr, '\\frac{\\mr{d}#1}{\\mr{d}#2}' , 'expr is wrong'
+    eq nc.expr, '\\\\frac{\\\\mr{d}#1}{\\\\mr{d}#2}' , 'expr is wrong'
   end
 
   def test_new_commad_expand_arg0
     nc = Newcommand.new
-    nc.create '\\newcommand{\\mr}{\\mathrm}'
+    nc.create '\\\\newcommand{\\\\mr}{\\\\mathrm}'
 
-    eq (nc.expand "\\mr"), "\\mathrm"
-    eq (nc.expand "\\mr \\mr"), "\\mathrm \\mathrm"
-    eq (nc.expand "\\mrr \\mr"), "\\mrr \\mathrm"
+    eq (nc.expand '\\\\mr'), '\\\\mathrm'
+    eq (nc.expand "\\\\mr \\\\mr"), "\\\\mathrm \\\\mathrm"
+    eq (nc.expand "\\\\mrr \\\\mr"), "\\\\mrr \\\\mathrm"
   end
 
   def test_new_command_expand_arg2
     nc = Newcommand.new
-    nc.create '\\newcommand{\\diff}[2]{\\frac{\\mr{d}#1}{\\mr{d}#2}}'
+    nc.create '\\\\newcommand{\\\\diff}[2]{\\\\frac{\\\\mr{d}#1}{\\\\mr{d}#2}}'
 
-    eq (nc.expand "\\diff{y}{x}"), "\\frac{\\mr{d}y}{\\mr{d}x}"
-    eq (nc.expand " \\diff{y}{x} aaa"), " \\frac{\\mr{d}y}{\\mr{d}x} aaa"
-    eq (nc.expand " \\diff{y}{x} \\diff{f}{z}"), " \\frac{\\mr{d}y}{\\mr{d}x} \\frac{\\mr{d}f}{\\mr{d}z}"
-    eq (nc.expand " \\diff{y}{x} \\difff{f}{z}"), " \\frac{\\mr{d}y}{\\mr{d}x} \\difff{f}{z}"
+    eq (nc.expand "\\\\diff{y}{x}"), "\\\\frac{\\\\mr{d}y}{\\\\mr{d}x}"
+    eq (nc.expand " \\\\diff{y}{x} aaa"), " \\\\frac{\\\\mr{d}y}{\\\\mr{d}x} aaa"
+    eq (nc.expand " \\\\diff{y}{x} \\\\diff{f}{z}"), " \\\\frac{\\mr{d}y}{\\\\mr{d}x} \\\\frac{\\\\mr{d}f}{\\\\mr{d}z}"
+    eq (nc.expand " \\\\diff{y}{x} \\\\difff{f}{z}"), " \\\\frac{\\\\mr{d}y}{\\\\mr{d}x} \\\\difff{f}{z}"
   end
 end
 
 class RegexStateMachine
   attr_accessor :state
 
-  def initialize(ini_state, state_transition)
-    @state = ini_state
+  def initialize(initial_state, state_transition)
+    @state = initial_state
     @transition = state_transition
   end
 
@@ -209,7 +209,6 @@ class Test
   end
 end
 
-Test.new.run# 'wip'
 
 class Markdown
   def initialize(input_file)
@@ -223,7 +222,6 @@ class Markdown
     @data = []
     File.open(@inputfile) do |file|
       file.each_line do |line|
-        puts line
         @data << line
       end
     end
@@ -264,18 +262,46 @@ class Latex < Markdown
       end
       result
     end
-    self
   end
 end
 
-#Markdown.new("./technical_note.ipynb").edit do |line|
-#  puts line
-#end
+class Array
+  def expand sentence
+    reduce(sentence){|sen, nc| nc.expand(sen)}
+  end
+end
 
-mr = Newcommand.new
-mr.create('\newcommand{\mr}{\mathrm}')
-Latex.new("./technical_note.ipynb").edit do |math|
-  mr.expand(math)
-end.save("./technical_note_ed.ipynb")
+def main input_file, output_file
+  if input_file == output_file
+    puts "Are you sure to overwrite #{input_file}?"
+    puts "Put 'ok' to proceed."
+    answer = STDIN.gets.chomp
+    unless answer == 'ok'
+      puts 'Aborted.'
+      return
+    else
+      puts 'proceed'
+    end
+  end
+  newcommand_defs = []
+  Latex.new(input_file).edit do |tail|
+    result = ''
+    until tail == '' do
+      m = /(.*?)(\\\\newcommand.*)/.match tail
+      break unless m
+      result << newcommand_defs.expand(m[1])
+      tail = m[2]
+      nc = Newcommand.new
+      tail = nc.create tail
+      result << "{}"
+      newcommand_defs.unshift nc
+    end 
+    result + newcommand_defs.expand(tail)
+  end.save(output_file)
 
-puts "end"
+  puts "Wrote to #{output_file}"
+end
+
+#Test.new.run
+
+main ARGV[0], ARGV[1]
